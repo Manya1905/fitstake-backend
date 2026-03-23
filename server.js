@@ -301,7 +301,6 @@ app.post("/api/onramp/session", async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`FitStake backend running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
 });
