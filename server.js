@@ -300,6 +300,67 @@ app.post("/api/onramp/session", async (req, res) => {
   }
 });
 
+// ─── Vote Reasons (in-memory store) ─────────────────────────────────
+
+const voteStore = {};
+
+function voteKey(challengeId, voterAddress, targetAddress) {
+  return `${challengeId}:${voterAddress.toLowerCase()}:${targetAddress.toLowerCase()}`;
+}
+
+// Save or update a vote with optional reason
+app.post("/api/votes", (req, res) => {
+  const { challengeId, voterAddress, targetAddress, vote, reason } = req.body;
+
+  if (!challengeId || !voterAddress || !targetAddress || !vote) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  if (vote !== "approved" && vote !== "rejected") {
+    return res.status(400).json({ error: "Vote must be 'approved' or 'rejected'" });
+  }
+
+  if (vote === "rejected" && (!reason || reason.length < 20)) {
+    return res.status(400).json({ error: "Rejection reason must be at least 20 characters" });
+  }
+
+  const key = voteKey(challengeId, voterAddress, targetAddress);
+  voteStore[key] = {
+    challengeId,
+    voterAddress: voterAddress.toLowerCase(),
+    targetAddress: targetAddress.toLowerCase(),
+    vote,
+    reason: vote === "rejected" ? reason : null,
+    updatedAt: new Date().toISOString(),
+  };
+
+  res.json({ success: true });
+});
+
+// Get all votes by a voter for a challenge
+app.get("/api/votes/:challengeId/:voterAddress", (req, res) => {
+  const { challengeId, voterAddress } = req.params;
+  const prefix = `${challengeId}:${voterAddress.toLowerCase()}:`;
+
+  const votes = Object.entries(voteStore)
+    .filter(([k]) => k.startsWith(prefix))
+    .map(([, v]) => ({ targetAddress: v.targetAddress, vote: v.vote, reason: v.reason }));
+
+  res.json({ votes });
+});
+
+// Get all votes on a specific participant
+app.get("/api/votes/:challengeId/for/:targetAddress", (req, res) => {
+  const { challengeId, targetAddress } = req.params;
+  const suffix = `:${targetAddress.toLowerCase()}`;
+
+  const votes = Object.entries(voteStore)
+    .filter(([k]) => k.startsWith(`${challengeId}:`) && k.endsWith(suffix))
+    .map(([, v]) => ({ voterAddress: v.voterAddress, vote: v.vote, reason: v.reason }));
+
+  res.json({ votes });
+});
+
 // Start server
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`FitStake backend running on port ${PORT}`);
