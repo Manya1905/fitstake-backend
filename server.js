@@ -300,6 +300,43 @@ app.post("/api/onramp/session", async (req, res) => {
   }
 });
 
+// ─── User Registry (in-memory: wallet → email) ─────────────────────
+
+const userStore = {}; // { walletAddress: { email, registeredAt } }
+
+// Register or update a user's email + wallet mapping
+app.post("/api/users/register", (req, res) => {
+  const { walletAddress, email } = req.body;
+
+  if (!walletAddress || !email) {
+    return res.status(400).json({ error: "Missing walletAddress or email" });
+  }
+
+  userStore[walletAddress.toLowerCase()] = {
+    email,
+    registeredAt: new Date().toISOString(),
+  };
+
+  res.json({ success: true });
+});
+
+// Look up emails for multiple wallet addresses
+app.post("/api/users/lookup", (req, res) => {
+  const { addresses } = req.body;
+
+  if (!addresses || !Array.isArray(addresses)) {
+    return res.status(400).json({ error: "Missing addresses array" });
+  }
+
+  const result = {};
+  for (const addr of addresses) {
+    const user = userStore[addr.toLowerCase()];
+    result[addr.toLowerCase()] = user ? user.email : null;
+  }
+
+  res.json({ users: result });
+});
+
 // ─── Vote Reasons (in-memory store) ─────────────────────────────────
 
 const voteStore = {};
