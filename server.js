@@ -6,6 +6,11 @@ const axios = require("axios");
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Wallet address validation helper
+function isValidAddress(addr) {
+  return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
+}
+
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
@@ -14,9 +19,9 @@ app.use(cors({
       "http://localhost:3000",
     ];
     // Allow requests with no origin (mobile apps, curl) or matching origins
-    if (!origin || allowed.some(u => origin.startsWith(u.replace(/\/$/, '')))) {
+    if (!origin || allowed.some(u => origin === u.replace(/\/$/, ''))) {
       callback(null, true);
-    } else if (origin.includes("vercel.app")) {
+    } else if (origin === "https://fitstake.vercel.app") {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -66,10 +71,7 @@ app.post("/api/strava/token", async (req, res) => {
     });
   } catch (error) {
     console.error("Strava token error:", error.response?.data || error.message);
-    res.status(500).json({
-      error: "Failed to exchange Strava token",
-      details: error.response?.data || error.message,
-    });
+    res.status(500).json({ error: "Failed to exchange Strava token" });
   }
 });
 
@@ -145,10 +147,7 @@ app.post("/api/fitbit/token", async (req, res) => {
     });
   } catch (error) {
     console.error("Fitbit token error:", error.response?.data || error.message);
-    res.status(500).json({
-      error: "Failed to exchange Fitbit token",
-      details: error.response?.data || error.message,
-    });
+    res.status(500).json({ error: "Failed to exchange Fitbit token" });
   }
 });
 
@@ -258,10 +257,7 @@ app.get("/api/fitness/activities", async (req, res) => {
     res.json({ activities, provider });
   } catch (error) {
     console.error("Fitness activity error:", error.response?.data || error.message);
-    res.status(500).json({
-      error: "Failed to fetch activities",
-      details: error.response?.data || error.message,
-    });
+    res.status(500).json({ error: "Failed to fetch activities" });
   }
 });
 
@@ -311,6 +307,9 @@ app.post("/api/users/register", (req, res) => {
   if (!walletAddress || !email) {
     return res.status(400).json({ error: "Missing walletAddress or email" });
   }
+  if (!isValidAddress(walletAddress)) {
+    return res.status(400).json({ error: "Invalid wallet address format" });
+  }
 
   userStore[walletAddress.toLowerCase()] = {
     email,
@@ -351,6 +350,9 @@ app.post("/api/votes", (req, res) => {
 
   if (!challengeId || !voterAddress || !targetAddress || !vote) {
     return res.status(400).json({ error: "Missing required fields" });
+  }
+  if (!isValidAddress(voterAddress) || !isValidAddress(targetAddress)) {
+    return res.status(400).json({ error: "Invalid wallet address format" });
   }
 
   if (vote !== "approved" && vote !== "rejected") {
